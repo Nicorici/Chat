@@ -33,18 +33,12 @@ namespace Chat
                 Read(stream, message, "");
             }
 
-            ////var server = new Server();
-            ////server.Start();
-            ////server.AcceptClients();
-            ////Console.Read();
         }
 
         public void Start()
         {
             tcpListener.Start();
         }
-
-
 
         private void SendReceiveData(Client client)
         {
