@@ -4,101 +4,80 @@ using System.Net.Sockets;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Components;
 
-namespace Chat
+namespace Server
 {
     public class Client
     {
-        public string Name { get; }
-        public TcpClient TcpClient { get; set; }
-        public bool IsConnected { get => TcpClient.Connected; }
+        private TcpClient tcpClient;
+        private ChatStream chatStream;
+        private string message;
+        private string name = "";
 
         public Client()
         {
-            Console.Write("Please input your name : ");
-            Name = Console.ReadLine();
-            TcpClient = new TcpClient();
+            tcpClient = new TcpClient();
+            SetName();
         }
 
         public void Connect(IPEndPoint endpoint)
         {
-            try
-            {
-                TcpClient.Connect(endpoint);
-                SendReceiveData();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return;
-            }
+            tcpClient.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 5500));
+            chatStream = new ChatStream(tcpClient.GetStream());
+            Read();
+            Write(" has connected.");
+        }
+
+        private void Read()
+        {
+            chatStream.BeginReadMessage(m=>PrintMessage(m));
+        }
+
+        private void Write(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                Write(Console.ReadLine());
+            chatStream.Write((name + " : " + message),null);
+            Write(Console.ReadLine());
         }
 
         public void Close()
         {
-            TcpClient.Dispose();
-            TcpClient.Close();
+            chatStream.Close();
+            tcpClient.Dispose();
+            tcpClient.Close();
         }
 
-        private void SendReceiveData()
+        private void SetName()
         {
-            if (IsConnected)
+            Console.Write("Please input your name (1-20 characters,no \":\" characters) : ");
+            bool isInvalid = true;
+            while (isInvalid)
             {
-                var stream = TcpClient.GetStream();
-                byte[] buffer = Encoding.ASCII.GetBytes($"{Name} has connected."+'\0');
-                stream.Write(buffer);
-
-                ReadStream(stream, buffer, "");
-                WriteStream(stream, buffer);
+                name = Console.ReadLine();
+                if (name.Length < 1 || string.IsNullOrWhiteSpace(name))
+                {
+                    Console.WriteLine("The name does not contain any characteres...Please input your name again : ");
+                    continue;
+                }
+                if (name.Length > 20)
+                {
+                    Console.WriteLine("The name is too long...Please input your name again : ");
+                    continue;
+                }
+                if(name.Contains(':'))
+                {
+                    Console.WriteLine("The name cannot contain a the \":\" character...Please input again :");
+                    continue;
+                }
+                isInvalid = false;
             }
         }
 
-        static void Main(string[] args)
+        public void PrintMessage(Message message)
         {
-            var client = new Client();
-            client.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 5500));
-            Console.Read();
-        }
-
-        private  void WriteStream(NetworkStream stream, byte[] buffer)
-        {
-            buffer = Encoding.ASCII.GetBytes( Name + Console.ReadLine()+'\0');
-            stream.BeginWrite(buffer, 0, buffer.Length, r =>
-            {
-                stream.EndWrite(r);
-                WriteStream(stream, buffer);
-            }, null);
-
-        }
-
-        private static void ReadStream(NetworkStream stream, byte[] buffer, string message)
-        {
-            stream.BeginRead(buffer,
-                0,
-                buffer.Length, r =>
-                {
-                    var read = stream.EndRead(r);
-                    if (read == 0)
-                    {
-                        Console.WriteLine("Server has disconnected.");
-                        return;
-                    }
-                    string temp = Encoding.ASCII.GetString(buffer);
-                    for (int i = 0; i < temp.Length; i++)
-                        if (temp[i] != '\0')
-                            message += temp[i];
-                        else
-                        {
-                            if (message.Length > 0)
-                            {
-                                Console.WriteLine(message);
-                                message = "";
-                                break;
-                            }
-                        }
-                    ReadStream(stream, buffer, message);
-                },
-                null);
+            Console.WriteLine(message);
         }
     }
 }

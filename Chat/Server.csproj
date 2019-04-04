@@ -6,9 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Client">
-      <HintPath>..\Client\obj\Debug\netcoreapp2.1\Client.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\ChatStream\Components.csproj" />
+    <ProjectReference Include="..\Client\Client.csproj" />
   </ItemGroup>
 
 </Project>
