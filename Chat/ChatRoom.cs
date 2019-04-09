@@ -12,11 +12,9 @@ namespace Server
         public void Join(User user)
         {
             lock (listOperationsLock)
-            {
                 users.Add(user);
-                GetUserName(user);
-                ReadMessagesFromUser(user);
-            }
+            GetUserName(user);
+            ReadMessagesFromUser(user);
         }
 
         private void GetUserName(User user)
@@ -47,12 +45,10 @@ namespace Server
         public void Remove(User user, string message)
         {
             lock (listOperationsLock)
-            {
                 users.Remove(user);
-                user.Close();
-                SendDataToUsers(new Message(user.Name + message));
-                Console.WriteLine(user.Name + message);
-            }
+            user.Close();
+            SendDataToUsers(new Message(user.Name + message));
+            Console.WriteLine(user.Name + message);
         }
 
         private void SendDataToUsers(Message text)

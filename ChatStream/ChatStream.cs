@@ -53,6 +53,7 @@ namespace Components
         public void Write(string text, Action writeComplete, Action exception = null)
         {
             Message message = new Message(text + "\0");
+            if(StreamIsOn())
             stream.BeginWrite(message.ToByteArray(), 0, message.Length(), m =>
             {
                 try

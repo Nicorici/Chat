@@ -18,7 +18,7 @@ namespace Server
 
         public void Send(Message message,Action messageSent,Action disconnect)
         {
-            stream.Write(message.ToString(),null);
+            stream.Write(message.ToString(),null,disconnect);
         }
 
         public void BeginReceive(Action<Message> receive,Action readAgain=null, Action disconnect=null)
