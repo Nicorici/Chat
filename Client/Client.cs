@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using Components;
 
 namespace Server
@@ -12,34 +9,66 @@ namespace Server
     {
         private TcpClient tcpClient;
         private ChatStream chatStream;
-        private string message;
         private string name = "";
+        public string Name { get => name; }
 
-        public Client()
+        public Client(string name)
         {
             tcpClient = new TcpClient();
-            SetName();
+            this.name = name;
+            // SetName();
         }
 
         public void Connect(IPEndPoint endpoint)
         {
             tcpClient.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 5500));
             chatStream = new ChatStream(tcpClient.GetStream());
-            Read();
-            Write(" has connected.");
+          //  Read();
+            //Write(" has connected.");
         }
 
-        private void Read()
+        public void Read()
         {
-            chatStream.BeginReadMessage(m=>PrintMessage(m));
+            chatStream.BeginReadMessage(m => PrintMessage(m), Read, () =>
+             {
+                 Console.WriteLine("The server is not responding...");
+                 Close();
+             });
         }
 
-        private void Write(string message)
+        public void Write(string message)
         {
             if (string.IsNullOrWhiteSpace(message))
-                Write(Console.ReadLine());
-            chatStream.Write((name + " : " + message),null);
-            Write(Console.ReadLine());
+            {
+              //  Write(Console.ReadLine());
+            }
+
+            if (message == "DISCONNECT.")
+            {
+                chatStream.Write((name + " : " + message), null, Close);
+                Close();
+                Environment.Exit(0);
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                message = $"this is the {i} message from client {name}";
+                chatStream.Write((name + " : " + message ), null, Close);
+            }
+            //  Write(Console.ReadLine());
+
+            //message = Console.ReadLine();
+            //WriteMessage(message, 1000000);
+
+        }
+
+        private void WriteMessage(string message, int times)
+        {
+            Console.WriteLine($"sendinng message{ times}");
+            chatStream.Write((name + " : " + message), () =>
+            {
+                if (times > 0)
+                    WriteMessage(message, times - 1);
+            }, null);
         }
 
         public void Close()
@@ -66,7 +95,7 @@ namespace Server
                     Console.WriteLine("The name is too long...Please input your name again : ");
                     continue;
                 }
-                if(name.Contains(':'))
+                if (name.Contains(':'))
                 {
                     Console.WriteLine("The name cannot contain a the \":\" character...Please input again :");
                     continue;

@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Net.Sockets;
-using System.Linq;
-using System.IO;
 using Components;
 
 namespace Server
@@ -11,10 +7,8 @@ namespace Server
     public class User
     {
         private TcpClient client;
-        private string name;
         public ChatStream stream;
-
-        public string Name { get ; internal set; }
+        public string Name { get; internal set; }
 
         public User(TcpClient client)
         {
@@ -22,17 +16,14 @@ namespace Server
             this.stream = new ChatStream(client.GetStream());
         }
 
-        public void Send(byte[] message)
+        public void Send(Message message,Action messageSent,Action disconnect)
         {
             stream.Write(message.ToString(),null);
         }
 
-        public void BeginReceive(Action<Message> receive)
+        public void BeginReceive(Action<Message> receive,Action readAgain=null, Action disconnect=null)
         {
-            stream.BeginReadMessage(s =>
-            {
-                receive(s);
-            });
+            stream.BeginReadMessage(receive,readAgain, disconnect);
         }
 
         public void Close()

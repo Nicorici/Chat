@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.IO;
-using System.Threading;
-using System.Net;
-using System.Net.Sockets;
+﻿using System.Text;
 
 namespace Components
 {
@@ -20,17 +14,7 @@ namespace Components
             this.message = message;
         }
 
-        public bool IsValid()
-        {
-            if (string.IsNullOrWhiteSpace(message))
-                return false;
-            return true;
-        }
-
-        public int Length()
-        {
-            return message.Length;
-        }
+        public int Length() => message.Length;
 
         public override string ToString() => message;
 
@@ -38,6 +22,7 @@ namespace Components
 
         public byte[] ToByteArray() => Encoding.ASCII.GetBytes(message);
 
+        public override int GetHashCode() => base.GetHashCode();
     }
 }
 

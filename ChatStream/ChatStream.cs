@@ -1,8 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.Text;
-using System.Net;
-using System.Linq;
 using System.Net.Sockets;
 
 
@@ -13,64 +10,47 @@ namespace Components
         private NetworkStream stream;
         private string pendingText = "";
 
-        //public ChatStream(Stream stream)
-        //    : this(new StreamWrapper(stream))
-        //{
-        //}
-
         public ChatStream(NetworkStream stream)
         {
             this.stream = stream;
         }
 
-        public void BeginReadMessage(Action<Message> readComplete, Action disconnect = null)
+        public void BeginReadMessage(Action<Message> messageComplete, Action readAgain=null, Action disconnect = null)
         {
+            Message mess = new Message("");
             var index = pendingText.IndexOf('\0');
-            if (index != -1)
-            {
-                readComplete(new Message(pendingText.Substring(0, index)));
-                pendingText = pendingText.Substring(index+1);
-                return;
-            }
-
+           
             byte[] buffer = new byte[1024];
-            stream.BeginRead(buffer, 0, buffer.Length, r =>
-            {
-                int read = 0;
-                try
+            if (StreamIsOn())
+                stream.BeginRead(buffer, 0, buffer.Length, r =>
                 {
-                    read = stream.EndRead(r);
-                    if (read == 0)
+                    int read = 0;
+                    try
                     {
-                        Console.WriteLine("Disconnect in read{0}",read);
-                        throw new Exception();
+                        read = stream.EndRead(r);
                     }
-                }
-                catch 
-                {
-                    Console.WriteLine("diconecet catch.");
-                    disconnect?.Invoke();
-                    return;
-                }
+                    catch
+                    {
+                        disconnect?.Invoke();
+                        return;
+                    }
 
-                var stringRead = Encoding.UTF8.GetString(buffer, 0, read);
-                pendingText += stringRead;
-                index = pendingText.IndexOf('\0');
-
-                if (index != -1)
-                {
-                    readComplete(new Message(pendingText.Substring(0, index)));
-                    pendingText = pendingText.Substring(index + 1);
-                }
-                //else
-                //{
-                //    BeginReadMessage(readComplete, disconnect);
-                //}
-                BeginReadMessage(readComplete, disconnect);
-            }, null);
+                    var stringRead = Encoding.UTF8.GetString(buffer, 0, read);
+                    pendingText += stringRead;
+                    index = pendingText.IndexOf('\0');
+                  
+                    while (index != -1)
+                    {
+                        mess = new Message(pendingText.Substring(0, index));
+                        pendingText = pendingText.Substring(index + 1);
+                        index = pendingText.IndexOf('\0');
+                        messageComplete(mess);
+                    }
+                    readAgain?.Invoke();
+                }, disconnect);
         }
 
-        public void Write(string text , Action writeComplete,Action exception=null)
+        public void Write(string text, Action writeComplete, Action exception = null)
         {
             Message message = new Message(text + "\0");
             stream.BeginWrite(message.ToByteArray(), 0, message.Length(), m =>
@@ -80,12 +60,17 @@ namespace Components
                     stream.EndWrite(m);
                     writeComplete?.Invoke();
                 }
-                catch 
+                catch
                 {
                     exception?.Invoke();
                     return;
                 }
-            }, null);
+            }, exception);
+        }
+
+        private bool StreamIsOn()
+        {
+            return stream.CanRead && stream.CanWrite;
         }
 
         public void Close()
@@ -93,6 +78,5 @@ namespace Components
             stream.Flush();
             stream.Close();
         }
-
     }
 }

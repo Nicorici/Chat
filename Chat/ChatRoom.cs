@@ -1,82 +1,83 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Text;
-using System.Net;
-using System.Net.Sockets;
-using System.Linq;
-using System.Threading;
-using System.IO;
 using Components;
 
 namespace Server
 {
     public class ChatRoom
     {
-        private ChatStream chatStream;
+        private readonly object listOperationsLock = new object();
         private List<User> users = new List<User>();
 
         public void Join(User user)
         {
-            users.Add(user);
-            user.BeginReceive(m =>
+            lock (listOperationsLock)
             {
-                if (string.IsNullOrWhiteSpace(user.Name))
-                {
-                    user.Name = GetName(m);
-                    string replace = m.ToString().Replace(":", "");
-                    Console.WriteLine(replace);
-                    SendDataToUsers(new Message(replace));
-                    return;
-                }
-                Console.WriteLine(m);
-                SendDataToUsers(m);
+                users.Add(user);
+                GetUserName(user);
+                ReadMessagesFromUser(user);
             }
+        }
+
+        private void GetUserName(User user)
+        {
+            user.BeginReceive(m => user.Name = GetName(m));
+        }
+
+        private void ReadMessagesFromUser(User user)
+        {
+            user.BeginReceive(m => HandleNewMessage(user, m),
+            () => ReadMessagesFromUser(user),
+            () => Remove(user, " has lost connection...")
             );
         }
 
-        public void Remove(User user)
+        private void HandleNewMessage(User user, Message m)
         {
-            user.Close();
-            users.Remove(user);
+            if (m.Equals(user.Name + " : " + "DISCONNECT."))
+            {
+                Remove(user, " has left the chat...");
+                return;
+            }
+
+            Console.WriteLine(m);
+            SendDataToUsers(m);
+        }
+
+        public void Remove(User user, string message)
+        {
+            lock (listOperationsLock)
+            {
+                users.Remove(user);
+                user.Close();
+                SendDataToUsers(new Message(user.Name + message));
+                Console.WriteLine(user.Name + message);
+            }
         }
 
         private void SendDataToUsers(Message text)
         {
-            string disconnectedMsg = "";
-            var disconnectedUsers = new List<User>();
-            foreach (var user in users)
+            lock (listOperationsLock)
             {
-                if (user.Name != GetName(text))
+                foreach (var user in users)
+                {
+                    if (user.Name + " :" != GetName(text))
 
-                    try
-                    {
-                        user.stream.Write(text.ToString(), null);
-                    }
-                    catch
-                    {
-                        disconnectedMsg += user.Name.Replace(":","") + " has disconnected...\0";
-                        Console.WriteLine(user.Name.Replace(":","") + " has disconnected...");
-                        disconnectedUsers.Add(user);
-                    }
+                        try
+                        {
+                            user.Send(text, null, user.Close);
+                        }
+                        catch
+                        {
+                        }
+                }
             }
-            if(disconnectedUsers.Count>0)
-            RemoveClients(disconnectedUsers, disconnectedMsg.TrimEnd());
         }
-
-        private void RemoveClients(List<User> list, string message)
-        {
-            foreach (var user in list)
-                Remove(user);
-
-            SendDataToUsers(new Message(message));
-        }
-
 
         private string GetName(Message message)
         {
             string temp = message.ToString();
-            return temp.Substring(0, temp.IndexOf(':')+1);
+            return temp.Substring(0, temp.IndexOf(':') + 1);
         }
     }
 }
